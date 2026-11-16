@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Compress PDF - Smart Digital Seva</title>
+
+<style>
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: Arial, sans-serif;
+  background: #f0f4f8;
+  margin: 0;
+  padding: 20px;
+}
+
+.container {
+  max-width: 600px;
+  margin: 25px auto;
+  background: white;
+  padding: 25px;
+  border-radius: 12px;
+  box-shadow: 0 3px 12px #0002;
+}
+
+h1 {
+  text-align: center;
+  color: #0755a5;
+}
+
+label {
+  display: block;
+  margin-top: 18px;
+  font-weight: bold;
+}
+
+input, select {
+  width: 100%;
+  padding: 12px;
+  margin-top: 8px;
+  border: 1px solid #bbb;
+  border-radius: 6px;
+}
+
+button {
+  width: 100%;
+  padding: 13px;
+  margin-top: 18px;
+  background: #0755a5;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+button:disabled {
+  background: #888;
+  cursor: not-allowed;
+}
+
+.info {
+  background: #eef5ff;
+  padding: 12px;
+  border-radius: 7px;
+  margin-top: 15px;
+  font-size: 14px;
+}
+
+#status {
+  text-align: center;
+  font-weight: bold;
+  margin-top: 15px;
+}
+
+.back {
+  display: block;
+  text-align: center;
+  margin-top: 20px;
+  color: #0755a5;
+  text-decoration: none;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>Compress PDF</h1>
+
+<p>Upload your PDF and try to reduce its file size.</p>
+
+<label>Select PDF File</label>
+<input type="file" id="pdfFile" accept=".pdf,application/pdf">
+
+<div class="info" id="fileInfo">
+Original file size: Not selected
+</div>
+
+<label>Compression Level</label>
+<select id="level">
+  <option value="low">Low Compression - Better Quality</option>
+  <option value="medium" selected>Medium Compression</option>
+  <option value="high">High Compression - Smaller Images</option>
+</select>
+
+<button id="compressBtn" disabled>Compress PDF</button>
+
+<p id="status"></p>
+
+<div class="info" id="result" style="display:none;"></div>
+
+<a href="index.html" class="back">← Back to Home</a>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+"https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+const pdfInput = document.getElementById("pdfFile");
+const compressBtn = document.getElementById("compressBtn");
+const status = document.getElementById("status");
+const fileInfo = document.getElementById("fileInfo");
+const result = document.getElementById("result");
+
+let selectedFile = null;
+
+function formatKB(bytes) {
+  return (bytes / 1024).toFixed(2) + " KB";
+}
+
+pdfInput.addEventListener("change", function() {
+
+  selectedFile = pdfInput.files[0] || null;
+  status.textContent = "";
+  result.style.display = "none";
+
+  if (selectedFile) {
+    fileInfo.textContent =
+      "Original file size: " + formatKB(selectedFile.size);
+
+    compressBtn.disabled = false;
+  } else {
+    fileInfo.textContent = "Original file size: Not selected";
+    compressBtn.disabled = true;
+  }
+});
+
+compressBtn.addEventListener("click", async function() {
+
+  if (!selectedFile) return;
+
+  if (!window.pdfjsLib || !window.jspdf) {
+    status.textContent = "Library load nahi hui. Internet check karein.";
+    return;
+  }
+
+  compressBtn.disabled = true;
+  result.style.display = "none";
+
+  try {
+
+    status.textContent = "PDF processing ho rahi hai...";
+
+    const level = document.getElementById("level").value;
+
+    let scale = 1.5;
+    let quality = 0.75;
+
+    if (level === "low") {
+      scale = 2;
+      quality = 0.90;
+    }
+
+    if (level === "medium") {
+      scale = 1.5;
+      quality = 0.70;
+    }
+
+    if (level === "high") {
+      scale = 1.1;
+      quality = 0.48;
+    }
+
+    const buffer = await selectedFile.arrayBuffer();
+
+    const pdfDocument = await pdfjsLib.getDocument({
+      data: new Uint8Array(buffer)
+    }).promise;
+
+    const { jsPDF } = window.jspdf;
+
+    let outputPdf = null;
+
+    for (let i = 1; i <= pdfDocument.numPages; i++) {
+
+      status.textContent =
+        "Processing page " + i + " of " + pdfDocument.numPages;
+
+      const page = await pdfDocument.getPage(i);
+      const viewport = page.getViewport({ scale: scale });
+
+      const canvas = document.createElement("canvas");
+      const context = canvas.getContext("2d");
+
+      canvas.width = Math.ceil(viewport.width);
+      canvas.height = Math.ceil(viewport.height);
+
+      await page.render({
+        canvasContext: context,
+        viewport: viewport
+      }).promise;
+
+      const imageData = canvas.toDataURL(
+        "image/jpeg",
+        quality
+      );
+
+      const width = viewport.width;
+      const height = viewport.height;
+
+      if (i === 1) {
+        outputPdf = new jsPDF({
+          orientation: width > height ? "landscape" : "portrait",
+          unit: "pt",
+          format: [width, height],
+          compress: true
+        });
+      } else {
+        outputPdf.addPage(
+          [width, height],
+          width > height ? "landscape" : "portrait"
+        );
+      }
+
+      outputPdf.addImage(
+        imageData,
+        "JPEG",
+        0,
+        0,
+        width,
+        height,
+        undefined,
+        "FAST"
+      );
+
+      page.cleanup();
+      canvas.width = 0;
+      canvas.height = 0;
+    }
+
+    const outputBlob = outputPdf.output("blob");
+
+    const originalSize = selectedFile.size;
+    const newSize = outputBlob.size;
+    const difference = originalSize - newSize;
+
+    const percent = originalSize > 0
+      ? ((difference / originalSize) * 100).toFixed(1)
+      : 0;
+
+    const url = URL.createObjectURL(outputBlob);
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "Smart-Digital-Seva-Compressed.pdf";
+    link.click();
+
+    setTimeout(function() {
+      URL.revokeObjectURL(url);
+    }, 1000);
+
+    result.style.display = "block";
+
+    result.innerHTML =
+      "<b>Original Size:</b> " + formatKB(originalSize) +
+      "<br><b>New Size:</b> " + formatKB(newSize) +
+      "<br><b>Size Difference:</b> " +
+      (difference >= 0
+        ? formatKB(difference) + " smaller (" + percent + "% reduction)"
+        : formatKB(Math.abs(difference)) + " larger") +
+      "<br><br><b>Note:</b> Pages have been converted into images. " +
+      "Text selection and searchable text may not be preserved.";
+
+    status.textContent = "PDF downloaded successfully!";
+
+    await pdfDocument.destroy();
+
+  } catch (error) {
+
+    status.textContent =
+      "Compression failed. Please try another PDF.";
+
+    console.error(error);
+
+  }
+
+  compressBtn.disabled = false;
+});
+</script>
+
+</body>
+<footer style="text-align:center; padding:20px; margin-top:30px; background:#eaf2fb;">
+    <p>© 2026 Smart Digital Seva. All Rights Reserved.</p>
+    <p>
+        <a href="index.html">Home</a> |
+        <a href="help.html">Help & Contact</a> |
+        <a href="privacy.html">Privacy Policy</a> |
+        <a href="terms.html">Terms & Conditions</a>
+    </p>
+    <p>Independent Digital Information Platform</p>
+</footer>
+</html>

@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Signature Resize - Smart Digital Seva</title>
+
+<style>
+body {
+  font-family: Arial, sans-serif;
+  background: #f2f6fc;
+  text-align: center;
+  padding: 20px;
+}
+.container {
+  background: white;
+  max-width: 450px;
+  margin: 30px auto;
+  padding: 25px;
+  border-radius: 12px;
+  box-shadow: 0 3px 12px #ccc;
+}
+h1 { color: #0755a5; }
+input, button {
+  margin: 10px;
+  padding: 10px;
+}
+input[type="number"] {
+  width: 110px;
+}
+button, .download {
+  background: #0755a5;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 12px 18px;
+  cursor: pointer;
+}
+.download {
+  display: inline-block;
+  text-decoration: none;
+  margin-top: 12px;
+}
+img {
+  max-width: 100%;
+  margin-top: 15px;
+}
+#result { margin-top: 20px; }
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>Signature Resize Tool</h1>
+<p>Signature ko apne hisab se resize karein.</p>
+
+<p><b>Upload Signature</b></p>
+<input type="file" id="photo" accept="image/*">
+
+<p><b>Width (Pixels)</b></p>
+<input type="number" id="width" value="300" min="1">
+
+<p><b>Height (Pixels)</b></p>
+<input type="number" id="height" value="100" min="1">
+
+<p>
+<input type="checkbox" id="keepRatio" checked>
+Keep Ratio
+</p>
+
+<p><b>Target File Size (KB)</b></p>
+<input type="number" id="targetKB" value="20" min="1" max="10000">
+
+<p>Quick Size:</p>
+<button onclick="setSize(10)">10 KB</button>
+<button onclick="setSize(20)">20 KB</button>
+<button onclick="setSize(30)">30 KB</button>
+<button onclick="setSize(50)">50 KB</button>
+
+<br>
+
+<button id="resizeBtn">Resize Signature</button>
+
+<div id="result"></div>
+
+</div>
+
+<script>
+function setSize(size) {
+  document.getElementById("targetKB").value = size;
+}
+
+const photo = document.getElementById("photo");
+const result = document.getElementById("result");
+
+document.getElementById("resizeBtn").addEventListener("click", function() {
+
+  const file = photo.files[0];
+  let width = Number(document.getElementById("width").value);
+  let height = Number(document.getElementById("height").value);
+  const target = Number(document.getElementById("targetKB").value);
+  const keepRatio = document.getElementById("keepRatio").checked;
+
+  if (!file) {
+    alert("Pehle signature upload karein!");
+    return;
+  }
+
+  if (!file.type.startsWith("image/")) {
+    alert("Please image file select karein.");
+    return;
+  }
+
+  if (!Number.isInteger(width) || !Number.isInteger(height) ||
+      width < 1 || height < 1 || width > 5000 || height > 5000) {
+    alert("Width aur height 1 se 5000 pixels ke beech rakhein.");
+    return;
+  }
+
+  if (!Number.isFinite(target) || target < 1 || target > 10000) {
+    alert("KB size 1 se 10000 ke beech rakhein.");
+    return;
+  }
+
+  result.innerHTML = "Signature resize ho raha hai...";
+
+  const url = URL.createObjectURL(file);
+  const image = new Image();
+
+  image.onload = function() {
+
+    let finalWidth = width;
+    let finalHeight = height;
+
+    if (keepRatio) {
+      const ratio = image.naturalWidth / image.naturalHeight;
+      finalHeight = Math.round(finalWidth / ratio);
+    }
+
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+
+    canvas.width = finalWidth;
+    canvas.height = finalHeight;
+
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, finalWidth, finalHeight);
+    ctx.drawImage(image, 0, 0, finalWidth, finalHeight);
+
+    const targetBytes = target * 1024;
+    let quality = 0.92;
+    let bestBlob = null;
+    let smallestBlob = null;
+    let attempts = 0;
+
+    function compress() {
+
+      canvas.toBlob(function(blob) {
+
+        if (!blob) {
+          result.innerHTML = "Signature resize nahi ho paya.";
+          URL.revokeObjectURL(url);
+          return;
+        }
+
+        attempts++;
+
+        if (!smallestBlob || blob.size < smallestBlob.size) {
+          smallestBlob = blob;
+        }
+
+        if (blob.size <= targetBytes) {
+          bestBlob = blob;
+        }
+
+        if (blob.size <= targetBytes || attempts >= 12 || quality <= 0.1) {
+          finish(bestBlob || smallestBlob, !!bestBlob);
+          return;
+        }
+
+        if (quality > 0.15) {
+          quality -= 0.08;
+        } else {
+          quality = 0.1;
+        }
+
+        compress();
+
+      }, "image/jpeg", quality);
+    }
+
+    function finish(blob, reachedTarget) {
+
+      URL.revokeObjectURL(url);
+
+      const downloadURL = URL.createObjectURL(blob);
+      const originalSize = (file.size / 1024).toFixed(2);
+      const newSize = (blob.size / 1024).toFixed(2);
+
+      result.innerHTML = `
+        <h3>Signature Ready!</h3>
+        <p>Original Size: ${originalSize} KB</p>
+        <p>New Size: ${newSize} KB</p>
+        <p>Target Size: ${target} KB</p>
+        <p>Final Dimensions: ${finalWidth} x ${finalHeight} px</p>
+        <p>${reachedTarget
+          ? "Target KB achieve ho gaya!"
+          : "Target size achieve nahi hua. Best possible result diya gaya hai."}</p>
+        <img src="${downloadURL}" alt="Resized Signature">
+        <br>
+        <a class="download" href="${downloadURL}"
+           download="resized-signature.jpg">
+           Download Signature
+        </a>
+      `;
+    }
+
+    compress();
+  };
+
+  image.onerror = function() {
+    result.innerHTML = "Signature open nahi ho paya.";
+    URL.revokeObjectURL(url);
+  };
+
+  image.src = url;
+});
+</script>
+
+</body>
+<footer style="text-align:center; padding:20px; margin-top:30px; background:#eaf2fb;">
+    <p>© 2026 Smart Digital Seva. All Rights Reserved.</p>
+    <p>
+        <a href="index.html">Home</a> |
+        <a href="help.html">Help & Contact</a> |
+        <a href="privacy.html">Privacy Policy</a> |
+        <a href="terms.html">Terms & Conditions</a>
+    </p>
+    <p>Independent Digital Information Platform</p>
+</footer>
+</html>

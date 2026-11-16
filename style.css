@@ -1,0 +1,149 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: Arial, sans-serif;
+    background: #f0f5ff;
+    color: #263238;
+    line-height: 1.6;
+}
+
+header {
+    background: linear-gradient(135deg, #063b82, #0878d1);
+    color: white;
+    text-align: center;
+    padding: 35px 15px;
+    border-bottom: 5px solid #f5c542;
+}
+
+header h1 {
+    font-size: 34px;
+    margin-bottom: 8px;
+}
+
+header p {
+    font-size: 16px;
+}
+
+nav {
+    background: #ffffff;
+    padding: 15px;
+    text-align: center;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+}
+
+nav a {
+    color: #0755a5;
+    text-decoration: none;
+    font-weight: bold;
+    margin: 8px 12px;
+    display: inline-block;
+}
+
+nav a:hover {
+    color: #e69b00;
+}
+
+#search {
+    display: block;
+    width: 90%;
+    max-width: 600px;
+    margin: 25px auto;
+    padding: 15px;
+    border: 2px solid #c5d8f5;
+    border-radius: 30px;
+    font-size: 16px;
+    outline: none;
+}
+
+#search:focus {
+    border-color: #0878d1;
+}
+
+h2 {
+    text-align: center;
+    color: #0755a5;
+    margin: 25px 10px;
+}
+
+.services-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 20px;
+    padding: 20px;
+    max-width: 1200px;
+    margin: auto;
+}
+
+.service {
+    background: white;
+    padding: 25px 15px;
+    border-radius: 14px;
+    text-align: center;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+    border: 1px solid #e0eaff;
+    transition: 0.3s;
+}
+
+a.service {
+    color: #0755a5;
+    text-decoration: none;
+    display: block;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.service:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.13);
+    border-color: #0878d1;
+}
+
+section {
+    padding: 20px;
+    text-align: center;
+}
+
+footer {
+    background: #063b82;
+    color: white;
+    text-align: center;
+    padding: 25px 15px;
+    margin-top: 35px;
+}
+
+footer a {
+    color: white;
+    text-decoration: none;
+    margin: 5px;
+}
+
+footer a:hover {
+    color: #ffd45c;
+}
+
+@media screen and (max-width: 600px) {
+    header h1 {
+        font-size: 26px;
+    }
+
+    nav a {
+        margin: 5px;
+    }
+
+    .services-grid {
+        grid-template-columns: 1fr;
+        padding: 12px;
+    }
+
+    .service {
+        padding: 20px;
+    }
+
+    #search {
+        width: 95%;
+    }
+}

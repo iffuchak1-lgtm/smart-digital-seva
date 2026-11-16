@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Split PDF - Smart Digital Seva</title>
+
+<style>
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: Arial, sans-serif;
+  background: #f0f4f8;
+  margin: 0;
+  padding: 20px;
+}
+
+.container {
+  max-width: 600px;
+  margin: 25px auto;
+  background: white;
+  padding: 25px;
+  border-radius: 12px;
+  box-shadow: 0 3px 12px #0002;
+}
+
+h1 {
+  color: #0755a5;
+  text-align: center;
+}
+
+label {
+  display: block;
+  margin-top: 18px;
+  font-weight: bold;
+}
+
+input {
+  width: 100%;
+  padding: 12px;
+  margin-top: 8px;
+  border: 1px solid #bbb;
+  border-radius: 6px;
+}
+
+button {
+  width: 100%;
+  padding: 13px;
+  margin-top: 18px;
+  background: #0755a5;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+button:disabled {
+  background: #888;
+  cursor: not-allowed;
+}
+
+.info {
+  background: #eef5ff;
+  padding: 12px;
+  border-radius: 7px;
+  margin-top: 15px;
+}
+
+#status {
+  text-align: center;
+  font-weight: bold;
+  margin-top: 15px;
+}
+
+.back {
+  display: block;
+  text-align: center;
+  margin-top: 20px;
+  color: #0755a5;
+  text-decoration: none;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>Split PDF</h1>
+
+<p>Extract selected pages from your PDF file.</p>
+
+<label>Select PDF File</label>
+<input type="file" id="pdfFile" accept=".pdf,application/pdf">
+
+<div class="info" id="fileInfo">
+PDF information will appear here.
+</div>
+
+<label>Start Page</label>
+<input type="number" id="startPage" min="1" placeholder="Example: 1">
+
+<label>End Page</label>
+<input type="number" id="endPage" min="1" placeholder="Example: 3">
+
+<button id="splitBtn" disabled>Split PDF & Download</button>
+
+<p id="status"></p>
+
+<a href="index.html" class="back">← Back to Home</a>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+
+<script>
+const pdfInput = document.getElementById("pdfFile");
+const startInput = document.getElementById("startPage");
+const endInput = document.getElementById("endPage");
+const splitBtn = document.getElementById("splitBtn");
+const fileInfo = document.getElementById("fileInfo");
+const status = document.getElementById("status");
+
+let selectedFile = null;
+let totalPages = 0;
+
+pdfInput.addEventListener("change", async function() {
+
+  selectedFile = pdfInput.files[0] || null;
+  totalPages = 0;
+
+  splitBtn.disabled = true;
+  status.textContent = "";
+  startInput.value = "";
+  endInput.value = "";
+
+  if (!selectedFile) {
+    fileInfo.textContent = "PDF information will appear here.";
+    return;
+  }
+
+  try {
+
+    status.textContent = "PDF checking...";
+
+    const bytes = await selectedFile.arrayBuffer();
+
+    const pdf = await PDFLib.PDFDocument.load(bytes);
+
+    totalPages = pdf.getPageCount();
+
+    fileInfo.textContent =
+      "File: " + selectedFile.name +
+      " | Total Pages: " + totalPages;
+
+    startInput.max = totalPages;
+    endInput.max = totalPages;
+
+    startInput.value = 1;
+    endInput.value = totalPages;
+
+    splitBtn.disabled = false;
+    status.textContent = "PDF ready!";
+
+  } catch (error) {
+
+    fileInfo.textContent = "PDF could not be opened.";
+    status.textContent = "Please select a valid PDF file.";
+
+  }
+
+});
+
+splitBtn.addEventListener("click", async function() {
+
+  if (!selectedFile || totalPages === 0) return;
+
+  const start = Number(startInput.value);
+  const end = Number(endInput.value);
+
+  if (
+    !Number.isInteger(start) ||
+    !Number.isInteger(end) ||
+    start < 1 ||
+    end < start ||
+    end > totalPages
+  ) {
+    status.textContent =
+      "Please enter a valid page range (1 to " + totalPages + ").";
+    return;
+  }
+
+  splitBtn.disabled = true;
+
+  try {
+
+    status.textContent = "Selected pages are being extracted...";
+
+    const bytes = await selectedFile.arrayBuffer();
+
+    const originalPdf = await PDFLib.PDFDocument.load(bytes);
+
+    const newPdf = await PDFLib.PDFDocument.create();
+
+    const pageIndexes = [];
+
+    for (let i = start - 1; i < end; i++) {
+      pageIndexes.push(i);
+    }
+
+    const copiedPages = await newPdf.copyPages(
+      originalPdf,
+      pageIndexes
+    );
+
+    copiedPages.forEach(function(page) {
+      newPdf.addPage(page);
+    });
+
+    const newBytes = await newPdf.save();
+
+    const blob = new Blob([newBytes], {
+      type: "application/pdf"
+    });
+
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+
+    link.href = url;
+    link.download = "Smart-Digital-Seva-Split.pdf";
+
+    link.click();
+
+    setTimeout(function() {
+      URL.revokeObjectURL(url);
+    }, 1000);
+
+    status.textContent =
+      "Success! Pages " + start + " to " + end +
+      " downloaded as a new PDF.";
+
+  } catch (error) {
+
+    status.textContent =
+      "PDF split failed. Please try another PDF.";
+
+    console.error(error);
+
+  }
+
+  splitBtn.disabled = false;
+
+});
+</script>
+
+</body>
+<footer style="text-align:center; padding:20px; margin-top:30px; background:#eaf2fb;">
+    <p>© 2026 Smart Digital Seva. All Rights Reserved.</p>
+    <p>
+        <a href="index.html">Home</a> |
+        <a href="help.html">Help & Contact</a> |
+        <a href="privacy.html">Privacy Policy</a> |
+        <a href="terms.html">Terms & Conditions</a>
+    </p>
+    <p>Independent Digital Information Platform</p>
+</footer>
+</html>

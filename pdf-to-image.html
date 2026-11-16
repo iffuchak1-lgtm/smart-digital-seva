@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDF to Image - Smart Digital Seva</title>
+
+<style>
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: Arial, sans-serif;
+  background: #f0f4f8;
+  margin: 0;
+  padding: 20px;
+}
+
+.container {
+  max-width: 650px;
+  margin: 25px auto;
+  background: white;
+  padding: 25px;
+  border-radius: 12px;
+  box-shadow: 0 3px 12px #0002;
+}
+
+h1 {
+  text-align: center;
+  color: #0755a5;
+}
+
+label {
+  display: block;
+  margin-top: 18px;
+  font-weight: bold;
+}
+
+input, select {
+  width: 100%;
+  padding: 12px;
+  margin-top: 8px;
+  border: 1px solid #bbb;
+  border-radius: 6px;
+}
+
+button {
+  width: 100%;
+  padding: 13px;
+  margin-top: 15px;
+  background: #0755a5;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+button:disabled {
+  background: #888;
+  cursor: not-allowed;
+}
+
+.page {
+  border: 1px solid #ddd;
+  padding: 12px;
+  margin-top: 15px;
+  border-radius: 8px;
+}
+
+.page img {
+  width: 100%;
+  max-height: 350px;
+  object-fit: contain;
+  margin-top: 10px;
+}
+
+.page button {
+  background: #16834a;
+}
+
+#status {
+  text-align: center;
+  font-weight: bold;
+  margin-top: 15px;
+}
+
+.back {
+  display: block;
+  text-align: center;
+  margin-top: 20px;
+  color: #0755a5;
+  text-decoration: none;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>PDF to Image</h1>
+<p>Convert PDF pages into JPG images easily.</p>
+
+<label>Select PDF File</label>
+<input type="file" id="pdfFile" accept="application/pdf,.pdf">
+
+<label>Image Quality</label>
+<select id="quality">
+  <option value="1">High Quality</option>
+  <option value="0.85" selected>Normal Quality</option>
+  <option value="0.65">Small File Size</option>
+</select>
+
+<button id="convertBtn">Convert PDF to Images</button>
+
+<p id="status"></p>
+
+<div id="results"></div>
+
+<a href="index.html" class="back">← Back to Home</a>
+
+</div>
+
+<!-- PDF.js library -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
+<!-- JSZip library -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+<script>
+const pdfInput = document.getElementById("pdfFile");
+const convertBtn = document.getElementById("convertBtn");
+const status = document.getElementById("status");
+const results = document.getElementById("results");
+
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+"https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+let imageFiles = [];
+
+convertBtn.addEventListener("click", async function () {
+
+  const file = pdfInput.files[0];
+
+  if (!file) {
+    status.textContent = "Please select a PDF file first.";
+    return;
+  }
+
+  if (!window.pdfjsLib || !window.JSZip) {
+    status.textContent = "Libraries load nahi hui. Internet check karein.";
+    return;
+  }
+
+  convertBtn.disabled = true;
+  results.innerHTML = "";
+  imageFiles = [];
+
+  try {
+    status.textContent = "PDF convert ho rahi hai...";
+
+    const quality = Number(
+      document.getElementById("quality").value
+    );
+
+    const buffer = await file.arrayBuffer();
+
+    const pdf = await pdfjsLib.getDocument({
+      data: new Uint8Array(buffer)
+    }).promise;
+
+    for (let i = 1; i <= pdf.numPages; i++) {
+
+      status.textContent =
+        "Converting page " + i + " of " + pdf.numPages + "...";
+
+      const page = await pdf.getPage(i);
+      const viewport = page.getViewport({ scale: 1.5 });
+
+      const canvas = document.createElement("canvas");
+      const context = canvas.getContext("2d");
+
+      canvas.width = Math.ceil(viewport.width);
+      canvas.height = Math.ceil(viewport.height);
+
+      await page.render({
+        canvasContext: context,
+        viewport: viewport
+      }).promise;
+
+      const blob = await new Promise(function(resolve) {
+        canvas.toBlob(resolve, "image/jpeg", quality);
+      });
+
+      if (!blob) {
+        throw new Error("Image conversion failed");
+      }
+
+      const imageName = "page-" + i + ".jpg";
+
+      imageFiles.push({
+        name: imageName,
+        blob: blob
+      });
+
+      const imageURL = URL.createObjectURL(blob);
+
+      const pageDiv = document.createElement("div");
+      pageDiv.className = "page";
+
+      const heading = document.createElement("h3");
+      heading.textContent = "Page " + i;
+
+      const img = document.createElement("img");
+      img.src = imageURL;
+
+      const downloadBtn = document.createElement("button");
+      downloadBtn.textContent = "Download Page " + i;
+
+      downloadBtn.addEventListener("click", function() {
+        downloadBlob(blob, imageName);
+      });
+
+      pageDiv.appendChild(heading);
+      pageDiv.appendChild(img);
+      pageDiv.appendChild(downloadBtn);
+
+      results.appendChild(pageDiv);
+
+      page.cleanup();
+      canvas.width = 0;
+      canvas.height = 0;
+    }
+
+    const zipBtn = document.createElement("button");
+    zipBtn.textContent = "Download All Images (ZIP)";
+
+    zipBtn.addEventListener("click", downloadAllZip);
+
+    results.appendChild(zipBtn);
+
+    status.textContent =
+      "Success! " + pdf.numPages + " pages converted.";
+
+    pdf.destroy();
+
+  } catch (error) {
+    status.textContent =
+      "Conversion failed. Please try another PDF file.";
+    console.error(error);
+  }
+
+  convertBtn.disabled = false;
+});
+
+function downloadBlob(blob, name) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+
+  link.href = url;
+  link.download = name;
+  link.click();
+
+  setTimeout(function() {
+    URL.revokeObjectURL(url);
+  }, 1000);
+}
+
+async function downloadAllZip() {
+
+  if (imageFiles.length === 0) return;
+
+  const zip = new JSZip();
+
+  imageFiles.forEach(function(item) {
+    zip.file(item.name, item.blob);
+  });
+
+  status.textContent = "ZIP file ban rahi hai...";
+
+  const zipBlob = await zip.generateAsync({
+    type: "blob"
+  });
+
+  downloadBlob(zipBlob, "Smart-Digital-Seva-Images.zip");
+
+  status.textContent = "All images downloaded successfully!";
+}
+</script>
+
+</body>
+<footer style="text-align:center; padding:20px; margin-top:30px; background:#eaf2fb;">
+    <p>© 2026 Smart Digital Seva. All Rights Reserved.</p>
+    <p>
+        <a href="index.html">Home</a> |
+        <a href="help.html">Help & Contact</a> |
+        <a href="privacy.html">Privacy Policy</a> |
+        <a href="terms.html">Terms & Conditions</a>
+    </p>
+    <p>Independent Digital Information Platform</p>
+</footer>
+</html>

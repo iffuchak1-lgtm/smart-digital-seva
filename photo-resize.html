@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Photo Resize - Smart Digital Seva</title>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f2f6fc;
+      margin: 0;
+      color: #222;
+    }
+
+    header {
+      background: #0755a5;
+      color: white;
+      text-align: center;
+      padding: 25px;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: 30px auto;
+      padding: 25px;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 3px 12px #0002;
+    }
+
+    input {
+      display: block;
+      width: 100%;
+      margin: 12px 0;
+      padding: 10px;
+      box-sizing: border-box;
+    }
+
+    button {
+      background: #0755a5;
+      color: white;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      margin: 8px 5px 8px 0;
+    }
+
+    button:hover {
+      background: #063b70;
+    }
+
+    img {
+      max-width: 100%;
+      margin-top: 15px;
+    }
+
+    #result {
+      color: green;
+      font-weight: bold;
+    }
+
+    a {
+      color: #0755a5;
+    }
+  </style>
+</head>
+
+<body>
+
+<header>
+  <h1>Photo Resize Tool</h1>
+  <p>Smart Digital Seva</p>
+</header>
+
+<div class="container">
+
+  <h2>Apni Photo Select Karein</h2>
+
+  <input type="file" id="photo" accept="image/*">
+
+  <p>Width (pixels)</p>
+  <input type="number" id="width" value="300" min="1" max="5000">
+
+  <p>Height (pixels)</p>
+  <input type="number" id="height" value="300" min="1" max="5000">
+
+  <label>
+    <input type="checkbox" id="keepRatio" checked>
+    Original photo ka ratio maintain karein
+  </label>
+
+  <button id="resizeBtn">Resize Photo</button>
+
+  <p id="result"></p>
+
+  <h3>Preview:</h3>
+  <img id="preview" alt="Resized photo preview" hidden>
+
+  <br>
+
+  <a id="download" hidden download="resized-photo.jpg">
+    <button type="button">Download Photo</button>
+  </a>
+
+  <p><a href="index.html">← Home Page par wapas jaayein</a></p>
+
+</div>
+
+<script>
+  const photoInput = document.getElementById("photo");
+  const widthInput = document.getElementById("width");
+  const heightInput = document.getElementById("height");
+  const ratioInput = document.getElementById("keepRatio");
+  const preview = document.getElementById("preview");
+  const result = document.getElementById("result");
+  const download = document.getElementById("download");
+
+  let selectedImage = null;
+  let originalWidth = 0;
+  let originalHeight = 0;
+  let downloadUrl = null;
+
+  photoInput.addEventListener("change", function () {
+    const file = photoInput.files[0];
+
+    selectedImage = null;
+    preview.hidden = true;
+    download.hidden = true;
+    result.textContent = "";
+
+    if (downloadUrl) {
+      URL.revokeObjectURL(downloadUrl);
+      downloadUrl = null;
+    }
+
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      result.textContent = "Please ek valid image select karein.";
+      return;
+    }
+
+    const imageUrl = URL.createObjectURL(file);
+    const image = new Image();
+
+    image.onload = function () {
+      selectedImage = image;
+      originalWidth = image.naturalWidth;
+      originalHeight = image.naturalHeight;
+
+      widthInput.value = originalWidth;
+      heightInput.value = originalHeight;
+
+      URL.revokeObjectURL(imageUrl);
+      result.textContent = "Photo successfully select ho gayi!";
+    };
+
+    image.onerror = function () {
+      URL.revokeObjectURL(imageUrl);
+      result.textContent = "Photo open nahi ho saki.";
+    };
+
+    image.src = imageUrl;
+  });
+
+  widthInput.addEventListener("input", function () {
+    if (selectedImage && ratioInput.checked) {
+      const w = Number(widthInput.value);
+      if (w > 0) {
+        heightInput.value = Math.round(
+          w * originalHeight / originalWidth
+        );
+      }
+    }
+  });
+
+  heightInput.addEventListener("input", function () {
+    if (selectedImage && ratioInput.checked) {
+      const h = Number(heightInput.value);
+      if (h > 0) {
+        widthInput.value = Math.round(
+          h * originalWidth / originalHeight
+        );
+      }
+    }
+  });
+
+  document.getElementById("resizeBtn").addEventListener("click", function () {
+    if (!selectedImage) {
+      result.textContent = "Pehle photo select karein.";
+      return;
+    }
+
+    const width = Number(widthInput.value);
+    const height = Number(heightInput.value);
+
+    if (!Number.isInteger(width) || !Number.isInteger(height) ||
+        width < 1 || height < 1 || width > 5000 || height > 5000) {
+      result.textContent = "Width aur Height 1 se 5000 pixels ke beech honi chahiye.";
+      return;
+    }
+
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+
+    const context = canvas.getContext("2d");
+    context.drawImage(selectedImage, 0, 0, width, height);
+
+    canvas.toBlob(function (blob) {
+      if (!blob) {
+        result.textContent = "Photo resize nahi ho saki.";
+        return;
+      }
+
+      if (downloadUrl) {
+        URL.revokeObjectURL(downloadUrl);
+      }
+
+      downloadUrl = URL.createObjectURL(blob);
+      preview.src = downloadUrl;
+      preview.hidden = false;
+      download.href = downloadUrl;
+      download.hidden = false;
+
+      result.textContent = "Photo resize successfully ho gayi!";
+    }, "image/jpeg", 0.92);
+  });
+</script>
+
+</body>
+<footer style="text-align:center; padding:20px; margin-top:30px; background:#eaf2fb;">
+    <p>© 2026 Smart Digital Seva. All Rights Reserved.</p>
+    <p>
+        <a href="index.html">Home</a> |
+        <a href="help.html">Help & Contact</a> |
+        <a href="privacy.html">Privacy Policy</a> |
+        <a href="terms.html">Terms & Conditions</a>
+    </p>
+    <p>Independent Digital Information Platform</p>
+</footer>
+</html>

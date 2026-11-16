@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Image to PDF - Smart Digital Seva</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      background: #f0f4f8;
+      margin: 0;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: 25px auto;
+      background: white;
+      padding: 25px;
+      border-radius: 12px;
+      box-shadow: 0 3px 12px #0002;
+    }
+
+    h1 {
+      color: #0755a5;
+      text-align: center;
+    }
+
+    label {
+      display: block;
+      margin-top: 18px;
+      font-weight: bold;
+    }
+
+    input, select {
+      width: 100%;
+      padding: 12px;
+      margin-top: 8px;
+      border: 1px solid #bbb;
+      border-radius: 6px;
+    }
+
+    button {
+      width: 100%;
+      padding: 13px;
+      margin-top: 18px;
+      background: #0755a5;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      background: #888;
+      cursor: not-allowed;
+    }
+
+    #status {
+      text-align: center;
+      margin-top: 15px;
+      font-weight: bold;
+    }
+
+    .preview {
+      margin-top: 20px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .preview img {
+      width: 90px;
+      height: 110px;
+      object-fit: contain;
+      border: 1px solid #ddd;
+      padding: 4px;
+    }
+
+    .back {
+      display: block;
+      text-align: center;
+      margin-top: 20px;
+      color: #0755a5;
+      text-decoration: none;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="container">
+    <h1>Image to PDF</h1>
+    <p>Select multiple photos and convert them into one PDF file.</p>
+
+    <label>Select Photos</label>
+    <input type="file" id="images" accept="image/*" multiple>
+
+    <label>Page Size</label>
+    <select id="pageSize">
+      <option value="a4">A4</option>
+      <option value="letter">Letter</option>
+    </select>
+
+    <label>Page Orientation</label>
+    <select id="orientation">
+      <option value="portrait">Portrait</option>
+      <option value="landscape">Landscape</option>
+    </select>
+
+    <div class="preview" id="preview"></div>
+
+    <button id="convertBtn" disabled>Convert to PDF</button>
+
+    <p id="status"></p>
+
+    <a href="index.html" class="back">← Back to Home</a>
+  </div>
+
+  <!-- Free jsPDF library. Internet is required to load this library. -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <script>
+    const imageInput = document.getElementById("images");
+    const preview = document.getElementById("preview");
+    const convertBtn = document.getElementById("convertBtn");
+    const status = document.getElementById("status");
+
+    let selectedFiles = [];
+
+    imageInput.addEventListener("change", function () {
+      selectedFiles = Array.from(imageInput.files || []);
+      preview.innerHTML = "";
+      status.textContent = "";
+
+      selectedFiles.forEach(function (file) {
+        const img = document.createElement("img");
+        const url = URL.createObjectURL(file);
+
+        img.src = url;
+        img.onload = function () {
+          URL.revokeObjectURL(url);
+        };
+
+        preview.appendChild(img);
+      });
+
+      convertBtn.disabled = selectedFiles.length === 0;
+    });
+
+    function loadImage(file) {
+      return new Promise(function (resolve, reject) {
+        const reader = new FileReader();
+
+        reader.onload = function () {
+          const img = new Image();
+
+          img.onload = function () {
+            resolve(img);
+          };
+
+          img.onerror = reject;
+          img.src = reader.result;
+        };
+
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    convertBtn.addEventListener("click", async function () {
+      if (selectedFiles.length === 0) {
+        status.textContent = "Please select photos first.";
+        return;
+      }
+
+      if (!window.jspdf) {
+        status.textContent = "PDF library load nahi hui. Internet check karke page reload karein.";
+        return;
+      }
+
+      convertBtn.disabled = true;
+      status.textContent = "PDF ban rahi hai...";
+
+      try {
+        const { jsPDF } = window.jspdf;
+
+        const pageSize = document.getElementById("pageSize").value;
+        const orientation = document.getElementById("orientation").value;
+
+        const pdf = new jsPDF({
+          orientation: orientation,
+          unit: "mm",
+          format: pageSize
+        });
+
+        for (let i = 0; i < selectedFiles.length; i++) {
+          const img = await loadImage(selectedFiles[i]);
+
+          if (i > 0) {
+            pdf.addPage();
+          }
+
+          const pageWidth = pdf.internal.pageSize.getWidth();
+          const pageHeight = pdf.internal.pageSize.getHeight();
+
+          const margin = 10;
+          const availableWidth = pageWidth - margin * 2;
+          const availableHeight = pageHeight - margin * 2;
+
+          const ratio = Math.min(
+            availableWidth / img.width,
+            availableHeight / img.height
+          );
+
+          const width = img.width * ratio;
+          const height = img.height * ratio;
+
+          const x = (pageWidth - width) / 2;
+          const y = (pageHeight - height) / 2;
+
+          const canvas = document.createElement("canvas");
+          canvas.width = img.naturalWidth;
+          canvas.height = img.naturalHeight;
+
+          const context = canvas.getContext("2d");
+          context.fillStyle = "#ffffff";
+          context.fillRect(0, 0, canvas.width, canvas.height);
+          context.drawImage(img, 0, 0);
+
+          const imageData = canvas.toDataURL("image/jpeg", 0.92);
+
+          pdf.addImage(
+            imageData,
+            "JPEG",
+            x,
+            y,
+            width,
+            height
+          );
+        }
+
+        pdf.save("Smart-Digital-Seva.pdf");
+        status.textContent = "PDF successfully downloaded!";
+
+      } catch (error) {
+        status.textContent = "PDF nahi ban payi. Dusri image try karein.";
+      }
+
+      convertBtn.disabled = false;
+    });
+  </script>
+
+</body>
+<footer style="text-align:center; padding:20px; margin-top:30px; background:#eaf2fb;">
+    <p>© 2026 Smart Digital Seva. All Rights Reserved.</p>
+    <p>
+        <a href="index.html">Home</a> |
+        <a href="help.html">Help & Contact</a> |
+        <a href="privacy.html">Privacy Policy</a> |
+        <a href="terms.html">Terms & Conditions</a>
+    </p>
+    <p>Independent Digital Information Platform</p>
+</footer>
+</html>

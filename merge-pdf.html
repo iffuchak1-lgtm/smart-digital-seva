@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Merge PDF - Smart Digital Seva</title>
+
+<style>
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: Arial, sans-serif;
+  background: #f0f4f8;
+  margin: 0;
+  padding: 20px;
+}
+
+.container {
+  max-width: 600px;
+  margin: 25px auto;
+  background: white;
+  padding: 25px;
+  border-radius: 12px;
+  box-shadow: 0 3px 12px #0002;
+}
+
+h1 {
+  color: #0755a5;
+  text-align: center;
+}
+
+label {
+  display: block;
+  margin-top: 18px;
+  font-weight: bold;
+}
+
+input {
+  width: 100%;
+  padding: 12px;
+  margin-top: 8px;
+  border: 1px solid #bbb;
+  border-radius: 6px;
+}
+
+button {
+  width: 100%;
+  padding: 13px;
+  margin-top: 18px;
+  background: #0755a5;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+button:disabled {
+  background: #888;
+  cursor: not-allowed;
+}
+
+.pdf-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px;
+  margin-top: 10px;
+  background: #f1f5fa;
+  border-radius: 7px;
+  overflow-wrap: anywhere;
+}
+
+.pdf-name {
+  flex: 1;
+}
+
+.remove-btn {
+  width: auto;
+  margin: 0;
+  padding: 8px 12px;
+  background: #d93025;
+}
+
+#status {
+  text-align: center;
+  font-weight: bold;
+  margin-top: 15px;
+}
+
+.back {
+  display: block;
+  text-align: center;
+  margin-top: 20px;
+  color: #0755a5;
+  text-decoration: none;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>Merge PDF</h1>
+
+<p>Select multiple PDF files and combine them into one PDF.</p>
+
+<label>Select PDF Files</label>
+<input type="file" id="pdfFiles" accept=".pdf,application/pdf" multiple>
+
+<div id="fileList"></div>
+
+<button id="mergeBtn" disabled>Merge PDF Files</button>
+
+<p id="status"></p>
+
+<a href="index.html" class="back">← Back to Home</a>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+
+<script>
+const fileInput = document.getElementById("pdfFiles");
+const fileList = document.getElementById("fileList");
+const mergeBtn = document.getElementById("mergeBtn");
+const status = document.getElementById("status");
+
+let selectedFiles = [];
+
+fileInput.addEventListener("change", function() {
+
+  selectedFiles = Array.from(fileInput.files || []);
+
+  fileList.innerHTML = "";
+  status.textContent = "";
+
+  selectedFiles.forEach(function(file, index) {
+
+    const item = document.createElement("div");
+    item.className = "pdf-item";
+
+    const name = document.createElement("span");
+    name.className = "pdf-name";
+    name.textContent = (index + 1) + ". " + file.name;
+
+    const removeBtn = document.createElement("button");
+    removeBtn.className = "remove-btn";
+    removeBtn.textContent = "Remove";
+
+    removeBtn.addEventListener("click", function() {
+      selectedFiles.splice(index, 1);
+      updateList();
+    });
+
+    item.appendChild(name);
+    item.appendChild(removeBtn);
+
+    fileList.appendChild(item);
+
+  });
+
+  mergeBtn.disabled = selectedFiles.length < 2;
+
+});
+
+function updateList() {
+
+  fileList.innerHTML = "";
+
+  selectedFiles.forEach(function(file, index) {
+
+    const item = document.createElement("div");
+    item.className = "pdf-item";
+
+    const name = document.createElement("span");
+    name.className = "pdf-name";
+    name.textContent = (index + 1) + ". " + file.name;
+
+    const removeBtn = document.createElement("button");
+    removeBtn.className = "remove-btn";
+    removeBtn.textContent = "Remove";
+
+    removeBtn.addEventListener("click", function() {
+      selectedFiles.splice(index, 1);
+      updateList();
+    });
+
+    item.appendChild(name);
+    item.appendChild(removeBtn);
+
+    fileList.appendChild(item);
+
+  });
+
+  mergeBtn.disabled = selectedFiles.length < 2;
+  status.textContent = "";
+}
+
+mergeBtn.addEventListener("click", async function() {
+
+  if (selectedFiles.length < 2) {
+    status.textContent = "Please select at least 2 PDF files.";
+    return;
+  }
+
+  if (!window.PDFLib) {
+    status.textContent = "Library load nahi hui. Internet check karein.";
+    return;
+  }
+
+  mergeBtn.disabled = true;
+
+  try {
+
+    status.textContent = "PDF files merge ho rahi hain...";
+
+    const mergedPdf = await PDFLib.PDFDocument.create();
+
+    for (let i = 0; i < selectedFiles.length; i++) {
+
+      status.textContent =
+        "Processing PDF " + (i + 1) + " of " + selectedFiles.length;
+
+      const bytes = await selectedFiles[i].arrayBuffer();
+
+      const pdf = await PDFLib.PDFDocument.load(bytes);
+
+      const pages = await mergedPdf.copyPages(
+        pdf,
+        pdf.getPageIndices()
+      );
+
+      pages.forEach(function(page) {
+        mergedPdf.addPage(page);
+      });
+
+    }
+
+    const mergedBytes = await mergedPdf.save();
+
+    const blob = new Blob([mergedBytes], {
+      type: "application/pdf"
+    });
+
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "Smart-Digital-Seva-Merged.pdf";
+    link.click();
+
+    setTimeout(function() {
+      URL.revokeObjectURL(url);
+    }, 1000);
+
+    status.textContent = "Success! Merged PDF downloaded.";
+
+  } catch (error) {
+
+    status.textContent =
+      "Merge failed. Please check your PDF files and try again.";
+
+    console.error(error);
+
+  }
+
+  mergeBtn.disabled = selectedFiles.length < 2;
+
+});
+</script>
+
+</body>
+<footer style="text-align:center; padding:20px; margin-top:30px; background:#eaf2fb;">
+    <p>© 2026 Smart Digital Seva. All Rights Reserved.</p>
+    <p>
+        <a href="index.html">Home</a> |
+        <a href="help.html">Help & Contact</a> |
+        <a href="privacy.html">Privacy Policy</a> |
+        <a href="terms.html">Terms & Conditions</a>
+    </p>
+    <p>Independent Digital Information Platform</p>
+</footer>
+</html>
